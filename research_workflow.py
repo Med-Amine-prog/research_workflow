@@ -1,8 +1,9 @@
 import os
 import time
+from typing import Iterator
 from agno.agent import Agent
-from agno.workflow import Workflow
-from agno.playground import Playground # <-- Import Playground
+from agno.workflow import Workflow, RunResponse
+from agno.playground import Playground 
 from agno.models.openai import OpenAIChat
 from agno.storage.sqlite import SqliteStorage
 from agno.tools.duckduckgo import DuckDuckGoTools
@@ -89,6 +90,34 @@ class ResearchWorkflow(Workflow):
         print("--- Workflow finished ---")
 
         return final_report.content
+    
+    def run(self, topic: str) -> str: # Note: I've renamed `execute` back to `run`
+        """
+        Executes the research workflow.
+        """
+        # ... (all the logic inside the run method is the same)
+        print(f"--- Starting research workflow for: {topic} ---")
+        # 1. Plan
+        plan = self.planner_agent.run(topic)
+        questions = [q.strip() for q in plan.content.split("\n") if q.strip()]
+        print(f"Plan generated:\n{plan.content}")
+        # 2. Research
+        research_results = []
+        for question in questions:
+            print(f"  Researching: {question}")
+            result = self.research_agent.run(question)
+            research_results.append(result.content)
+            time.sleep(1)
+        # 3. Write
+        print("\nStep 3: Writing the report...")
+        research_briefing = "\n\n".join(research_results)
+        final_report = self.writer_agent.run(research_briefing)
+        print("--- Workflow finished ---")
+
+        # --- 2. THE FIX IS HERE ---
+        # Wrap the final string in a RunResponse object
+        yield RunResponse(content=final_report.content)
+
 
 # --- STEP 2: Instantiate your Workflow ---
 research_workflow = ResearchWorkflow()
@@ -105,9 +134,6 @@ app = playground.get_app()
 if __name__ == "__main__":
     print("="*80)
     print("Starting the Research Workflow Playground application.")
-    print("Navigate to http://localhost:7777 to interact with the workflow.")
+    print("Navigate to the Playground URL and connect to this server.")
     print("="*80)
-    
-    # Make sure the app string matches your filename.
-    # If your file is `my_workflow.py`, use "my_workflow:app".
     playground.serve(app="research_workflow:app", reload=True)
